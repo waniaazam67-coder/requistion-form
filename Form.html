@@ -629,6 +629,7 @@ const DEPARTMENT_OPTIONS = [
     "Admin",
     "Procurement",
     "Communication",
+    "Programme",
     "HR",
     "IT",
     "AI",
@@ -1501,7 +1502,7 @@ function getTransportRowData(row) {
         vehicleType: row.querySelector(".transport-vehicle")?.value.trim() || "",
         passengers: row.querySelector(".travel-passengers")?.value.trim() || row.querySelector(".local-passengers")?.value.trim() || "",
         purpose: row.querySelector(".travel-purpose")?.value.trim() || row.querySelector(".local-purpose")?.value.trim() || row.querySelector(".transport-purpose")?.value.trim() || "",
-        pickupLocation: row.querySelector(".transport-pickup")?.value.trim() || "",
+        pickupLocation: row.querySelector(".transport-pickup")?.value.trim() || row.querySelector(".travel-pickup")?.value.trim() || row.querySelector(".local-pickup")?.value.trim() || "",
         dropoffLocation: row.querySelector(".transport-dropoff")?.value.trim() || "",
         goodsDescription: row.querySelector(".transport-goods")?.value.trim() || "",
         goodsQuantity: row.querySelector(".transport-quantity")?.value.trim() || "",
@@ -1685,6 +1686,7 @@ async function submitToSheets() {
     const payload = {
         requestedBy: document.getElementById("requesterName").value,
         email: userData.email || "",
+        requesterEmail: userData.email || "",
         lineManagerEmail: document.getElementById("lineManagerEmail").value.trim(),
         ccEmails: getCcEmails(),
         department: document.getElementById("department").value,
@@ -1897,9 +1899,10 @@ function hideSubmitStatus() {
             <div class="transport-fields" data-transport-type="Travel Request" hidden>
                 <div class="transport-section-title">Travel Request Details</div>
                 <div class="transport-hint">Purpose: use this request for official staff travel outside the city, inter-city movement, or longer planned duty travel that requires transport arrangements.</div>
-                <input type="date" class="travel-date" name="travelDate" placeholder="Departure Date">
-                <input type="time" class="travel-departure-time" name="travelDepartureTime" placeholder="Departure Time">
-                <input type="date" class="travel-return-date" name="travelReturnDate" placeholder="Return Date">
+                <input type="date" class="travel-date" name="travelDate" placeholder="Travel Date (Departure)">
+                <input type="time" class="travel-departure-time" name="travelDepartureTime" placeholder="Travel Time (Departure)">
+                <input type="date" class="travel-return-date" name="travelReturnDate" placeholder="Return Date (Back)">
+                <input type="text" class="travel-pickup" name="pickupLocation" placeholder="Pickup Location">
                 <input type="text" class="travel-destination" name="travelDestination" placeholder="Destination City / Area">
                 <input type="text" class="travel-duration" name="travelDuration" placeholder="Trip Duration">
                 <input type="number" class="travel-passengers" name="travelPassengers" placeholder="No. of Travelers" min="1">
@@ -1911,7 +1914,8 @@ function hideSubmitStatus() {
                 <div class="transport-hint">Purpose: use this request for in-city meetings, site visits, field visits, office errands, and other short same-day official movements within the city.</div>
                 <input type="date" class="local-visit-date" name="localVisitDate" placeholder="Visit Date">
                 <input type="time" class="local-departure-time" name="localDepartureTime" placeholder="Departure Time">
-                <input type="time" class="local-return-time" name="localReturnTime" placeholder="Expected Return Time">
+                <input type="time" class="local-return-time" name="localReturnTime" placeholder="Return Time">
+                <input type="text" class="local-pickup" name="pickupLocation" placeholder="Pickup Location">
                 <input type="text" class="local-destination" name="localDestination" placeholder="Meeting / Visit Location">
                 <input type="text" class="local-duration" name="localDuration" placeholder="Expected Duration">
                 <input type="number" class="local-passengers" name="localPassengers" placeholder="No. of Passengers" min="1">
