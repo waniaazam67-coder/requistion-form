@@ -1118,6 +1118,8 @@ const inventoryData = {
     "Red": "ITM-SRD",
     "Green": "ITM-SGR"
   },
+  "Toner for printer": { "NA": "ITM-TPR" },
+  "Sticker sheet ": { "A4": "ITM-SSA" },
   "Steel Scale": { "NA": "ITM-STS" },
   "Dollar Stapler Pins": { "NA": "IMT-DSP" },
   "Sticky notes": {
@@ -1508,6 +1510,7 @@ function getTransportRowData(row) {
         dropoffLocation: row.querySelector(".transport-dropoff")?.value.trim() || "",
         goodsDescription: row.querySelector(".transport-goods")?.value.trim() || "",
         goodsQuantity: row.querySelector(".transport-quantity")?.value.trim() || "",
+        advanceRequired: row.querySelector(".travel-advance-required")?.value.trim() || "",
         returnDate: row.querySelector(".travel-return-date")?.value.trim() || "",
         returnTime: row.querySelector(".local-return-time")?.value.trim() || ""
     };
@@ -1542,6 +1545,7 @@ function isValidTransportRow(rowData) {
             rowData.departureTime &&
             rowData.duration &&
             rowData.passengers &&
+            rowData.advanceRequired &&
             rowData.purpose
         );
     }
@@ -1581,6 +1585,7 @@ function getInventoryRowData(row) {
         dropoffLocation: "",
         goodsDescription: "",
         goodsQuantity: "",
+        advanceRequired: "",
         returnDate: "",
         returnTime: ""
     };
@@ -1907,6 +1912,7 @@ function hideSubmitStatus() {
                 <input type="text" class="travel-pickup" name="pickupLocation" placeholder="Pickup Location">
                 <input type="text" class="travel-destination" name="travelDestination" placeholder="Destination City / Area">
                 <input type="text" class="travel-duration" name="travelDuration" placeholder="Trip Duration">
+                <input type="number" class="travel-advance-required" name="advanceRequired" placeholder="Please enter advance amount" min="0">
                 <input type="number" class="travel-passengers" name="travelPassengers" placeholder="No. of Travelers" min="1">
                 <textarea class="travel-purpose" name="travelPurpose" placeholder="Purpose / Notes"></textarea>
             </div>
