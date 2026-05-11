@@ -16,8 +16,8 @@ jobs:
       - name: Deploy to Hostinger
         uses: SamKirkland/FTP-Deploy-Action@v4.4.0
         with:
-          server: 195.35.62.66
-          username: u228849669.requestsdev
-          password: ${{ secrets.FTP_PASSWORD }}
-          local-dir: ./
-          server-dir: ./
+            server: 195.35.62.66
+            username: u228849669.requestsdev
+            password: ${{ secrets.FTP_PASSWORD }}
+            local-dir: ./
+            server-dir: ./
