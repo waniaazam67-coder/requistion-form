@@ -1119,7 +1119,7 @@ const inventoryData = {
     "Green": "ITM-SGR"
   },
   "Toner for printer": { "NA": "ITM-TPR" },
-  "Sticker sheet ": { "A4": "ITM-SSA" },
+  "Sticker sheet": { "A4": "ITM-SSA" },
   "Steel Scale": { "NA": "ITM-STS" },
   "Dollar Stapler Pins": { "NA": "IMT-DSP" },
   "Sticky notes": {
@@ -1313,7 +1313,7 @@ function getItemsForCategory(category) {
 
 function getCategoryInventory(category = selectedCategory) {
     return getItemsForCategory(category).reduce((acc, itemName) => {
-        acc[itemName] = inventoryData[itemName];
+        acc[itemName.trim()] = inventoryData[itemName];
         return acc;
     }, {});
 }
