@@ -15,11 +15,11 @@
       <div class="brand">
         <div class="brand-mark"><i data-lucide="package-open"></i></div>
         <span>INVENTORY</span>
+        <button class="sidebar-toggle" id="sidebarToggle" type="button" aria-label="Collapse sidebar" aria-expanded="true"><i data-lucide="panel-left-close"></i></button>
       </div>
       <nav class="side-nav" id="sideNav">
         <button class="nav-item active" data-view="dashboard"><span class="nav-icon"><i data-lucide="layout-grid"></i></span><span>Dashboard</span></button>
         <button class="nav-item" data-view="requests"><span class="nav-icon"><i data-lucide="list-checks"></i></span><span>Requests</span></button>
-        <button class="nav-item" data-view="approvals"><span class="nav-icon"><i data-lucide="badge-check"></i></span><span>Approvals</span></button>
         <button class="nav-item" data-view="inventory"><span class="nav-icon"><i data-lucide="boxes"></i></span><span>Inventory</span></button>
         <button class="nav-item" data-view="stockIn"><span class="nav-icon"><i data-lucide="package-plus"></i></span><span>Stock In</span></button>
         <button class="nav-item" data-view="issue"><span class="nav-icon"><i data-lucide="package-minus"></i></span><span>Issue Stock</span></button>
@@ -76,10 +76,6 @@
               <div class="metric"><span class="metric-icon teal"><i data-lucide="scroll-text"></i></span><div><p>Audit Logs</p><strong id="kpiAudit">0</strong></div></div>
             </div>
           </article>
-          <article class="card chart-card">
-            <div class="chart-head"><h2>Stock Movement Statistics</h2><div class="legend"><span><b class="sales-dot"></b>Stock In</span><span><b class="purchase-dot"></b>Stock Out</span></div></div>
-            <div class="chart-wrap"><canvas id="salesChart"></canvas></div>
-          </article>
         </div>
       </section>
 
@@ -104,45 +100,18 @@
 
       <section class="view" id="requestsView">
         <div class="card table-card">
-          <div class="section-title"><h2>Requests List</h2><p>Raw request log plus dashboard status fields.</p></div>
-          <div class="table-wrap"><table><thead><tr><th>ID</th><th>Requester</th><th>Department</th><th>Location</th><th>Items</th><th>Status</th><th>Date</th><th>Print</th></tr></thead><tbody id="requestsTable"></tbody></table></div>
-        </div>
-      </section>
-
-      <section class="view" id="approvalsView">
-        <div class="card table-card">
-          <div class="section-title"><h2>Approvals</h2><p>Approve or reject requested lines before stock can be issued.</p></div>
-          <div class="table-wrap"><table><thead><tr><th>Request</th><th>Item ID</th><th>Item</th><th>Qty</th><th>Status</th><th>Action</th></tr></thead><tbody id="approvalsTable"></tbody></table></div>
+          <div class="section-title"><h2>Requests List</h2><p>Request lines with manager approval and issuance status.</p></div>
+          <div class="table-wrap"><table><thead><tr><th>ID</th><th>Requester</th><th>Department</th><th>Location</th><th>Item ID</th><th>Item</th><th>Type</th><th>Qty</th><th>Approval</th><th>Issue</th><th>Date</th></tr></thead><tbody id="requestsTable"></tbody></table></div>
         </div>
       </section>
 
       <section class="view" id="inventoryView">
-        <form id="itemForm" class="card form-card">
-          <div class="section-title"><h2>Add Inventory Item</h2><p>Create real item masters before adding stock or procurement records.</p></div>
-          <div class="form-grid">
-            <label>Item ID<input required name="code" placeholder="Enter item code"></label>
-            <label>Item name<input required name="name" placeholder="Enter item name"></label>
-            <label>Type / Specification<input name="type" placeholder="Size, variant, or specification"></label>
-            <label>Category<select required name="category"><option>RWHU</option><option>Stationary</option><option>Progressive</option></select></label>
-            <label>Reorder level<input min="0" type="number" name="reorderLevel" value="0"></label>
-            <label>Unit<input name="unit" placeholder="pcs, box, kg"></label>
-          </div>
-          <div class="form-actions"><button class="primary" type="submit"><i data-lucide="plus"></i>Add Item</button></div>
-        </form>
-        <form id="locationForm" class="card form-card compact-form">
-          <div class="section-title"><h2>Add Location</h2><p>Stock is tracked by Item ID plus location.</p></div>
-          <div class="form-grid">
-            <label>Location name<input required name="location" placeholder="Enter warehouse, office, or site"></label>
-          </div>
-          <div class="form-actions"><button class="primary" type="submit"><i data-lucide="map-pin-plus"></i>Add Location</button></div>
-        </form>
         <div class="card table-card">
           <div class="section-title"><h2>Inventory</h2><p>Current stock is calculated from the transaction ledger by Item ID + Location.</p></div>
-          <div class="category-tabs" id="categoryTabs">
-            <button class="category-tab active" type="button" data-category="All">All</button>
-            <button class="category-tab" type="button" data-category="RWHU">RWHU</button>
-            <button class="category-tab" type="button" data-category="Stationary">Stationary</button>
-            <button class="category-tab" type="button" data-category="Progressive">Progressive</button>
+          <div class="inventory-toolbar">
+            <div class="category-tabs" id="categoryTabs"></div>
+            <label class="inventory-location-filter">Location<select id="inventoryLocationFilter" data-locations></select></label>
+            <button class="primary" id="openItemModal" type="button"><i data-lucide="plus"></i>Add Item</button>
           </div>
           <div class="table-wrap"><table><thead><tr><th>Item ID</th><th>Name</th><th>Type</th><th>Category</th><th>Location</th><th>Stock</th><th>Status</th></tr></thead><tbody id="inventoryTable"></tbody></table></div>
           <div class="pagination" id="inventoryPagination">
@@ -157,10 +126,12 @@
         <form id="stockInForm" class="card form-card">
           <div class="section-title"><h2>Manual Stock In</h2><p>Use for opening balances, old stock entries, and adjustments.</p></div>
           <div class="form-grid">
-            <label>Item<select required name="itemCode" data-items></select></label>
+            <label>Category<select required name="category" id="stockInCategory" data-categories></select></label>
+            <label>Item name<select required name="itemName" id="stockInItemName" data-item-names data-category-source="stockInCategory"></select></label>
+            <label>Type<select required name="itemCode" id="stockInItemType" data-item-types data-item-source="stockInItemName" data-category-source="stockInCategory"></select></label>
+            <label>Selected Item ID<input readonly id="stockInItemId" placeholder="Choose an item"></label>
             <label>Location<select required name="location" data-locations></select></label>
             <label>Quantity<input required min="1" type="number" name="quantity"></label>
-            <label>Type<select required name="transactionType"><option>STOCK_IN_MANUAL</option><option>OPENING_BALANCE</option><option>ADJUSTMENT_IN</option></select></label>
             <label class="span-2">Notes<input name="notes" placeholder="Optional remarks"></label>
           </div>
           <div class="form-actions"><button class="primary" type="submit"><i data-lucide="package-plus"></i>Add Stock</button></div>
@@ -168,6 +139,20 @@
       </section>
 
       <section class="view" id="issueView">
+        <form id="manualStockOutForm" class="card form-card">
+          <div class="section-title"><h2>Manual Stock Out</h2><p>Use for direct stock issues or adjustments not linked to a request.</p></div>
+          <div class="form-grid">
+            <label>Category<select required name="category" id="stockOutCategory" data-categories></select></label>
+            <label>Item name<select required name="itemName" id="stockOutItemName" data-item-names data-category-source="stockOutCategory"></select></label>
+            <label>Type<select required name="itemCode" id="stockOutItemType" data-item-types data-item-source="stockOutItemName" data-category-source="stockOutCategory"></select></label>
+            <label>Selected Item ID<input readonly id="stockOutItemId" placeholder="Choose an item"></label>
+            <label>Location<select required name="location" data-locations></select></label>
+            <label>Quantity<input required min="1" type="number" name="quantity"></label>
+            <label>Issued by<input name="issuedBy" placeholder="Inventory Manager"></label>
+            <label class="span-2">Notes<input name="notes" placeholder="Optional remarks"></label>
+          </div>
+          <div class="form-actions"><button class="primary" type="submit"><i data-lucide="package-minus"></i>Stock Out</button></div>
+        </form>
         <div class="card table-card">
           <div class="section-title"><h2>Issue Approved Stock</h2><p>Issuance creates STOCK_OUT only when approved and stock is available.</p></div>
           <div class="table-wrap"><table><thead><tr><th>Request</th><th>Item</th><th>Location</th><th>Requested</th><th>Available</th><th>Issue Qty</th><th>Issued By</th><th>Action</th></tr></thead><tbody id="issueTable"></tbody></table></div>
@@ -178,16 +163,22 @@
         <form id="poForm" class="card form-card">
           <div class="section-title"><h2>Purchase Order</h2><p>PO tracks procurement only. It does not change inventory stock.</p></div>
           <div class="form-grid">
+            <label>PO number<input name="poNumber" placeholder="Leave blank for auto number"></label>
+            <label>Issue date<input name="issueDate" type="date"></label>
             <label>Vendor<select required name="vendorId" data-vendors></select></label>
             <label>Status<select name="status"><option>Open</option><option>Ordered</option><option>Closed</option></select></label>
-            <label>Item<select required name="itemCode" data-items></select></label>
             <label>Location<select required name="location" data-locations></select></label>
-            <label>Qty ordered<input required min="1" type="number" name="quantity"></label>
+            <label>Arrived by<input name="arrivedBy" type="date"></label>
+            <label class="span-2">Specifications<input required name="specifications" placeholder="Item details, specifications, or procurement description"></label>
+            <label>Quantity ordered<input required min="0" step="0.01" type="number" name="quantityOrdered"></label>
             <label>Unit price<input min="0" step="0.01" type="number" name="unitPrice" value="0"></label>
+            <label>Quantity received<input min="0" step="0.01" type="number" name="quantityReceived" value="0"></label>
+            <label>PO amount<input readonly name="poAmount" value="0"></label>
+            <label class="span-2">Notes / remarks<input name="notesRemarks" placeholder="Optional remarks"></label>
           </div>
           <div class="form-actions"><button class="primary" type="submit"><i data-lucide="file-plus"></i>Create PO</button></div>
         </form>
-        <div class="card table-card"><div class="table-wrap"><table><thead><tr><th>PO #</th><th>Vendor</th><th>Item</th><th>Qty</th><th>Status</th><th>Total</th><th>Print</th></tr></thead><tbody id="poTable"></tbody></table></div></div>
+        <div class="card table-card"><div class="table-wrap"><table><thead><tr><th>PO #</th><th>Issue Date</th><th>Vendor</th><th>Specifications</th><th>Qty Ordered</th><th>Unit Price</th><th>PO Amount</th><th>Status</th><th>Arrived By</th><th>Location</th><th>Qty Received</th><th>Print</th></tr></thead><tbody id="poTable"></tbody></table></div></div>
       </section>
 
       <section class="view" id="grnView">
@@ -247,6 +238,33 @@
       <button class="icon-danger remove-line" type="button" aria-label="Remove line"><i data-lucide="trash-2"></i></button>
     </div>
   </template>
+  <template id="itemTypeTemplate">
+    <div class="item-type-row">
+      <label>Type / Specification<input required name="type" placeholder="Size, variant, or specification"></label>
+      <label>Item ID<input required name="code" placeholder="Unique item ID"></label>
+      <button class="icon-danger remove-type" type="button" aria-label="Remove type"><i data-lucide="trash-2"></i></button>
+    </div>
+  </template>
+  <div class="modal-backdrop" id="itemModal" aria-hidden="true">
+    <form id="itemForm" class="card form-card modal-card">
+      <div class="modal-head">
+        <div class="section-title"><h2>Add Inventory Item</h2><p>Create item types with unique Item IDs.</p></div>
+        <button class="icon-btn" id="closeItemModal" type="button" aria-label="Close add item"><i data-lucide="x"></i></button>
+      </div>
+      <div class="form-grid">
+        <label>Category<select name="category" id="itemCategorySelect" data-categories></select></label>
+        <label>New category<input name="newCategory" placeholder="Only fill this to create a new category"></label>
+        <label>Item name<input required name="name" placeholder="Enter item name"></label>
+        <label>Unit<input name="unit" placeholder="pcs, box, kg"></label>
+      </div>
+      <div class="line-builder">
+        <h3>Item Types</h3>
+        <div id="itemTypeRows"></div>
+        <button class="secondary" id="addItemType" type="button"><i data-lucide="plus"></i>Add type</button>
+      </div>
+      <div class="form-actions"><button class="secondary" id="cancelItemModal" type="button">Cancel</button><button class="primary" type="submit"><i data-lucide="plus"></i>Add Item</button></div>
+    </form>
+  </div>
 
   <script src="https://unpkg.com/lucide@latest"></script>
   <script src="inventory-data.js"></script>

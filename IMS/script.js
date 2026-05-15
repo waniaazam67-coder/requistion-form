@@ -15,6 +15,7 @@ const seedState = {
 
 let state = loadState();
 let inventoryCategoryFilter = "All";
+let inventoryLocationFilter = "All";
 let inventoryPage = 1;
 const INVENTORY_PAGE_SIZE = 15;
 
@@ -71,6 +72,28 @@ function findItem(code) {
   return state.items.find((item) => item.code === code);
 }
 
+function categories() {
+  return [...new Set(state.items.map((item) => item.category).filter(Boolean))].sort((a, b) => a.localeCompare(b));
+}
+
+function itemLabel(item) {
+  return `${item.code} - ${item.name}${item.type ? ` (${item.type})` : ""}`;
+}
+
+function itemNamesForCategory(category) {
+  return [...new Set(state.items
+    .filter((item) => !category || item.category === category)
+    .map((item) => item.name)
+    .filter(Boolean))]
+    .sort((a, b) => a.localeCompare(b));
+}
+
+function itemTypesForName(name, category = "") {
+  return state.items
+    .filter((item) => item.name === name && (!category || item.category === category))
+    .sort((a, b) => String(a.type || "").localeCompare(String(b.type || "")));
+}
+
 function stockFor(itemCode, location) {
   return state.transactions
     .filter((entry) => entry.itemCode === itemCode && entry.location === location)
@@ -105,20 +128,61 @@ function money(value) {
   return Number(value || 0).toLocaleString(undefined, { maximumFractionDigits: 2 });
 }
 
+function formatDate(value) {
+  if (!value) return "";
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? value : date.toLocaleDateString();
+}
+
 function optionsHtml(values, getValue = (row) => row, getLabel = (row) => row) {
   return values.map((row) => `<option value="${getValue(row)}">${getLabel(row)}</option>`).join("");
 }
 
 function syncSelectOptions(scope = document) {
+  const currentCategories = categories();
+  scope.querySelectorAll("[data-categories]").forEach((select) => {
+    const selected = select.value;
+    select.innerHTML = `<option value="">Select category</option>${optionsHtml(currentCategories)}`;
+    if (selected && currentCategories.includes(selected)) select.value = selected;
+  });
   scope.querySelectorAll("[data-locations]").forEach((select) => {
     const selected = select.value;
     select.innerHTML = `<option value="">Select location</option>${optionsHtml(state.locations)}`;
     if (selected) select.value = selected;
   });
+  const inventoryLocationSelect = document.getElementById("inventoryLocationFilter");
+  inventoryLocationSelect.innerHTML = `<option value="All">All locations</option>${optionsHtml(state.locations)}`;
+  if (state.locations.includes(inventoryLocationFilter)) {
+    inventoryLocationSelect.value = inventoryLocationFilter;
+  } else {
+    inventoryLocationFilter = "All";
+    inventoryLocationSelect.value = "All";
+  }
   scope.querySelectorAll("[data-items]").forEach((select) => {
     const selected = select.value;
-    select.innerHTML = `<option value="">Select item</option>${optionsHtml(state.items, (item) => item.code, (item) => `${item.code} - ${item.name}`)}`;
-    if (selected) select.value = selected;
+    const categorySourceId = select.dataset.categorySource;
+    const category = categorySourceId ? document.getElementById(categorySourceId)?.value : "";
+    const items = category ? state.items.filter((item) => item.category === category) : state.items;
+    select.innerHTML = `<option value="">Select item</option>${optionsHtml(items, (item) => item.code, itemLabel)}`;
+    if (selected && items.some((item) => item.code === selected)) select.value = selected;
+  });
+  scope.querySelectorAll("[data-item-names]").forEach((select) => {
+    const selected = select.value;
+    const categorySourceId = select.dataset.categorySource;
+    const category = categorySourceId ? document.getElementById(categorySourceId)?.value : "";
+    const names = itemNamesForCategory(category);
+    select.innerHTML = `<option value="">Select item</option>${optionsHtml(names)}`;
+    if (selected && names.includes(selected)) select.value = selected;
+  });
+  scope.querySelectorAll("[data-item-types]").forEach((select) => {
+    const selected = select.value;
+    const itemSourceId = select.dataset.itemSource;
+    const itemName = itemSourceId ? document.getElementById(itemSourceId)?.value : "";
+    const categorySourceId = select.dataset.categorySource;
+    const category = categorySourceId ? document.getElementById(categorySourceId)?.value : "";
+    const items = itemName ? itemTypesForName(itemName, category) : [];
+    select.innerHTML = `<option value="">Select type</option>${optionsHtml(items, (item) => item.code, (item) => item.type || item.code)}`;
+    if (selected && items.some((item) => item.code === selected)) select.value = selected;
   });
   scope.querySelectorAll("[data-vendors]").forEach((select) => {
     const selected = select.value;
@@ -127,6 +191,38 @@ function syncSelectOptions(scope = document) {
   });
   const poSelect = document.getElementById("poSelect");
   poSelect.innerHTML = `<option value="">Manual receipt</option>${optionsHtml(state.purchaseOrders, (po) => po.poNumber, (po) => po.poNumber)}`;
+}
+
+function renderCategoryTabs() {
+  const tabs = document.getElementById("categoryTabs");
+  const values = ["All", ...categories()];
+  if (!values.includes(inventoryCategoryFilter)) inventoryCategoryFilter = "All";
+  tabs.innerHTML = values.map((category) => `
+    <button class="category-tab ${category === inventoryCategoryFilter ? "active" : ""}" type="button" data-category="${category}">${category}</button>
+  `).join("");
+}
+
+function updateSelectedItemId(typeSelectId, displayInputId) {
+  const item = findItem(document.getElementById(typeSelectId).value);
+  document.getElementById(displayInputId).value = item ? item.code : "";
+}
+
+function updateStockInItemId() {
+  updateSelectedItemId("stockInItemType", "stockInItemId");
+}
+
+function updateStockOutItemId() {
+  updateSelectedItemId("stockOutItemType", "stockOutItemId");
+}
+
+function openItemModal() {
+  document.getElementById("itemModal").classList.add("show");
+  document.getElementById("itemModal").setAttribute("aria-hidden", "false");
+}
+
+function closeItemModal() {
+  document.getElementById("itemModal").classList.remove("show");
+  document.getElementById("itemModal").setAttribute("aria-hidden", "true");
 }
 
 function setView(view) {
@@ -144,6 +240,16 @@ function addRequestLine() {
   row.querySelector(".remove-line").addEventListener("click", () => row.remove());
   document.getElementById("requestItems").appendChild(row);
   syncSelectOptions(row);
+  if (window.lucide) window.lucide.createIcons();
+}
+
+function addItemTypeLine() {
+  const template = document.getElementById("itemTypeTemplate");
+  const row = template.content.firstElementChild.cloneNode(true);
+  row.querySelector(".remove-type").addEventListener("click", () => {
+    if (document.querySelectorAll("#itemTypeRows .item-type-row").length > 1) row.remove();
+  });
+  document.getElementById("itemTypeRows").appendChild(row);
   if (window.lucide) window.lucide.createIcons();
 }
 
@@ -169,31 +275,23 @@ function renderDashboard() {
   document.getElementById("kpiGRN").textContent = state.purchaseOrders.filter((po) => po.status !== "Closed").length;
   document.getElementById("kpiTransport").textContent = state.transportRequests.filter((row) => row.arrangementStatus === "Pending").length;
   document.getElementById("kpiAudit").textContent = state.auditLogs.length;
-  drawChart();
 }
 
 function renderRequests() {
-  document.getElementById("requestsTable").innerHTML = state.requests.map((request) => `
+  document.getElementById("requestsTable").innerHTML = state.requests.flatMap((request) => request.items.map((item) => `
     <tr>
       <td>${request.requestId}</td><td>${request.requester}</td><td>${request.department}</td><td>${request.location}</td>
-      <td>${request.items.length}</td><td>${statusBadge(requestOverallStatus(request))}</td><td>${new Date(request.date).toLocaleDateString()}</td>
-      <td><button class="tiny" onclick="printRequest('${request.requestId}')">Print</button></td>
-    </tr>`).join("") || emptyRow(8);
-}
-
-function renderApprovals() {
-  document.getElementById("approvalsTable").innerHTML = state.requests.flatMap((request) => request.items.map((item) => `
-    <tr>
-      <td>${request.requestId}</td><td>${item.itemCode}</td><td>${item.itemName}</td><td>${item.quantity}</td><td>${statusBadge(item.approvalStatus)}</td>
-      <td class="button-cell">
-        <button class="tiny success" onclick="approveItem('${request.requestId}','${item.id}')">Approve</button>
-        <button class="tiny danger" onclick="rejectItem('${request.requestId}','${item.id}')">Reject</button>
-      </td>
-    </tr>`)).join("") || emptyRow(6);
+      <td>${item.itemCode}</td><td>${item.itemName}</td><td>${item.type || ""}</td><td>${item.quantity}</td>
+      <td>${statusBadge(item.approvalStatus)}</td><td>${statusBadge(item.issuanceStatus)}</td><td>${new Date(request.date).toLocaleDateString()}</td>
+    </tr>`)).join("") || emptyRow(11);
 }
 
 function renderInventory() {
-  const rows = stockRows().filter((row) => inventoryCategoryFilter === "All" || row.category === inventoryCategoryFilter);
+  const rows = stockRows().filter((row) => {
+    const matchesCategory = inventoryCategoryFilter === "All" || row.category === inventoryCategoryFilter;
+    const matchesLocation = inventoryLocationFilter === "All" || row.location === inventoryLocationFilter;
+    return matchesCategory && matchesLocation;
+  });
   const pageCount = Math.max(1, Math.ceil(rows.length / INVENTORY_PAGE_SIZE));
   inventoryPage = Math.min(Math.max(1, inventoryPage), pageCount);
   const start = (inventoryPage - 1) * INVENTORY_PAGE_SIZE;
@@ -223,8 +321,21 @@ function renderIssue() {
 
 function renderPO() {
   document.getElementById("poTable").innerHTML = state.purchaseOrders.map((po) => `
-    <tr><td>${po.poNumber}</td><td>${po.vendorName}</td><td>${po.itemCode || po.description || "Specification only"}</td><td>${po.quantity}</td><td>${statusBadge(po.status)}</td><td>${money(po.total)}</td><td><button class="tiny" onclick="printPO('${po.poNumber}')">Print</button></td></tr>
-  `).join("") || emptyRow(7);
+    <tr>
+      <td>${po.poNumber}</td>
+      <td>${formatDate(po.issueDate || po.date)}</td>
+      <td>${po.vendorName}</td>
+      <td>${po.specifications || po.description || po.itemCode || ""}</td>
+      <td>${money(po.quantityOrdered ?? po.quantity)}</td>
+      <td>${money(po.unitPrice)}</td>
+      <td>${money(po.poAmount ?? po.total)}</td>
+      <td>${statusBadge(po.status)}</td>
+      <td>${formatDate(po.arrivedBy)}</td>
+      <td>${po.location || ""}</td>
+      <td>${money(po.quantityReceived)}</td>
+      <td><button class="tiny" onclick="printPO('${po.poNumber}')">Print</button></td>
+    </tr>
+  `).join("") || emptyRow(12);
 }
 
 function renderGRN() {
@@ -258,9 +369,11 @@ function emptyRow(cols) {
 
 function render() {
   syncSelectOptions();
+  renderCategoryTabs();
+  updateStockInItemId();
+  updateStockOutItemId();
   renderDashboard();
   renderRequests();
-  renderApprovals();
   renderInventory();
   renderIssue();
   renderPO();
@@ -270,27 +383,6 @@ function render() {
   renderAudit();
   if (window.lucide) window.lucide.createIcons();
 }
-
-window.approveItem = function (requestId, itemId) {
-  const request = state.requests.find((row) => row.requestId === requestId);
-  const item = request.items.find((row) => row.id === itemId);
-  if (item.approvalStatus !== "Pending") return showToast("This item has already been reviewed.", "error");
-  item.approvalStatus = "Approved";
-  audit("APPROVE_REQUEST_ITEM", "request_item", itemId, `${requestId} approved for ${item.itemCode}`);
-  saveState();
-  render();
-};
-
-window.rejectItem = function (requestId, itemId) {
-  const request = state.requests.find((row) => row.requestId === requestId);
-  const item = request.items.find((row) => row.id === itemId);
-  if (item.issuanceStatus === "Issued") return showToast("Issued items cannot be rejected.", "error");
-  item.approvalStatus = "Rejected";
-  item.issuanceStatus = "Not Issued";
-  audit("REJECT_REQUEST_ITEM", "request_item", itemId, `${requestId} rejected for ${item.itemCode}`);
-  saveState();
-  render();
-};
 
 window.issueItem = function (requestId, itemId) {
   const request = state.requests.find((row) => row.requestId === requestId);
@@ -330,15 +422,9 @@ window.setTransport = function (id, status) {
   render();
 };
 
-window.printRequest = function (requestId) {
-  const request = state.requests.find((row) => row.requestId === requestId);
-  const html = `<h1>Requisition ${request.requestId}</h1><p>${request.requester} - ${request.department} - ${request.location}</p><table>${request.items.map((item) => `<tr><td>${item.itemCode}</td><td>${item.itemName}</td><td>${item.quantity}</td><td>${item.approvalStatus}</td><td>${item.issuanceStatus}</td></tr>`).join("")}</table>`;
-  printHtml(html);
-};
-
 window.printPO = function (poNumber) {
   const po = state.purchaseOrders.find((row) => row.poNumber === poNumber);
-  printHtml(`<h1>Purchase Order ${po.poNumber}</h1><p>Vendor: ${po.vendorName}</p><p>Item / Specification: ${po.itemCode || po.description || ""}</p><p>Qty: ${po.quantity}</p><p>Total: ${money(po.total)}</p>`);
+  printHtml(`<h1>Purchase Order ${po.poNumber}</h1><p>Issue Date: ${formatDate(po.issueDate || po.date)}</p><p>Vendor: ${po.vendorName}</p><p>Specifications: ${po.specifications || po.description || po.itemCode || ""}</p><p>Quantity Ordered: ${money(po.quantityOrdered ?? po.quantity)}</p><p>Unit Price: ${money(po.unitPrice)}</p><p>PO Amount: ${money(po.poAmount ?? po.total)}</p><p>Status: ${po.status}</p>`);
 };
 
 function printHtml(html) {
@@ -348,58 +434,19 @@ function printHtml(html) {
   printWindow.print();
 }
 
-function drawChart() {
-  const canvas = document.getElementById("salesChart");
-  if (!canvas) return;
-  const ctx = canvas.getContext("2d");
-  const rect = canvas.getBoundingClientRect();
-  const ratio = window.devicePixelRatio || 1;
-  canvas.width = Math.max(1, Math.floor(rect.width * ratio));
-  canvas.height = Math.max(1, Math.floor(rect.height * ratio));
-  ctx.setTransform(ratio, 0, 0, ratio, 0, 0);
-  const width = rect.width;
-  const height = rect.height;
-  ctx.clearRect(0, 0, width, height);
-  const plot = { left: 36, right: 16, top: 18, bottom: 24 };
-  plot.width = width - plot.left - plot.right;
-  plot.height = height - plot.top - plot.bottom;
-  const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun"];
-  const incoming = [20, 35, 25, 42, 30, state.transactions.filter((t) => !["STOCK_OUT", "ADJUSTMENT_OUT"].includes(t.type)).reduce((a, t) => a + t.quantity, 0) / 10];
-  const outgoing = [12, 15, 18, 11, 21, state.transactions.filter((t) => t.type === "STOCK_OUT").reduce((a, t) => a + t.quantity, 0) / 10];
-  const max = Math.max(50, ...incoming, ...outgoing);
-  ctx.font = "12px Inter, Arial";
-  ctx.strokeStyle = "#edf1f4";
-  ctx.fillStyle = "#8d98a1";
-  [0, max / 2, max].forEach((tick) => {
-    const y = plot.top + ((max - tick) / max) * plot.height;
-    ctx.beginPath();
-    ctx.moveTo(plot.left, y);
-    ctx.lineTo(width - plot.right, y);
-    ctx.stroke();
-    ctx.fillText(Math.round(tick), 4, y + 4);
-  });
-  function series(values, color) {
-    ctx.beginPath();
-    values.forEach((value, index) => {
-      const x = plot.left + (index * plot.width) / (values.length - 1);
-      const y = plot.top + ((max - value) / max) * plot.height;
-      index ? ctx.lineTo(x, y) : ctx.moveTo(x, y);
-    });
-    ctx.strokeStyle = color;
-    ctx.lineWidth = 2;
-    ctx.stroke();
-  }
-  series(incoming, "#17aeea");
-  series(outgoing, "#ff9477");
-  months.forEach((month, index) => {
-    const x = plot.left + (index * plot.width) / (months.length - 1);
-    ctx.fillText(month, x - 10, height - 5);
-  });
-}
-
 document.getElementById("sideNav").addEventListener("click", (event) => {
   const item = event.target.closest("[data-view]");
   if (item) setView(item.dataset.view);
+});
+
+document.getElementById("sidebarToggle").addEventListener("click", () => {
+  const shell = document.querySelector(".app-shell");
+  const collapsed = shell.classList.toggle("sidebar-collapsed");
+  const toggle = document.getElementById("sidebarToggle");
+  toggle.setAttribute("aria-expanded", String(!collapsed));
+  toggle.setAttribute("aria-label", collapsed ? "Expand sidebar" : "Collapse sidebar");
+  toggle.innerHTML = `<i data-lucide="${collapsed ? "panel-left-open" : "panel-left-close"}"></i>`;
+  if (window.lucide) window.lucide.createIcons();
 });
 
 document.getElementById("categoryTabs").addEventListener("click", (event) => {
@@ -408,6 +455,12 @@ document.getElementById("categoryTabs").addEventListener("click", (event) => {
   inventoryCategoryFilter = button.dataset.category;
   inventoryPage = 1;
   document.querySelectorAll(".category-tab").forEach((tab) => tab.classList.toggle("active", tab === button));
+  renderInventory();
+});
+
+document.getElementById("inventoryLocationFilter").addEventListener("change", (event) => {
+  inventoryLocationFilter = event.target.value || "All";
+  inventoryPage = 1;
   renderInventory();
 });
 
@@ -422,6 +475,53 @@ document.getElementById("inventoryNext").addEventListener("click", () => {
 });
 
 document.getElementById("addRequestItem").addEventListener("click", addRequestLine);
+document.getElementById("addItemType").addEventListener("click", addItemTypeLine);
+document.getElementById("openItemModal").addEventListener("click", openItemModal);
+document.getElementById("closeItemModal").addEventListener("click", closeItemModal);
+document.getElementById("cancelItemModal").addEventListener("click", closeItemModal);
+document.getElementById("itemModal").addEventListener("click", (event) => {
+  if (event.target.id === "itemModal") closeItemModal();
+});
+
+document.getElementById("stockInCategory").addEventListener("change", () => {
+  document.getElementById("stockInItemName").value = "";
+  document.getElementById("stockInItemType").value = "";
+  syncSelectOptions(document.getElementById("stockInForm"));
+  updateStockInItemId();
+});
+
+document.getElementById("stockInItemName").addEventListener("change", () => {
+  document.getElementById("stockInItemType").value = "";
+  syncSelectOptions(document.getElementById("stockInForm"));
+  updateStockInItemId();
+});
+
+document.getElementById("stockInItemType").addEventListener("change", updateStockInItemId);
+
+document.getElementById("stockOutCategory").addEventListener("change", () => {
+  document.getElementById("stockOutItemName").value = "";
+  document.getElementById("stockOutItemType").value = "";
+  syncSelectOptions(document.getElementById("manualStockOutForm"));
+  updateStockOutItemId();
+});
+
+document.getElementById("stockOutItemName").addEventListener("change", () => {
+  document.getElementById("stockOutItemType").value = "";
+  syncSelectOptions(document.getElementById("manualStockOutForm"));
+  updateStockOutItemId();
+});
+
+document.getElementById("stockOutItemType").addEventListener("change", updateStockOutItemId);
+
+function updatePOAmount() {
+  const form = document.getElementById("poForm");
+  const quantity = Number(form.elements.quantityOrdered.value) || 0;
+  const unitPrice = Number(form.elements.unitPrice.value) || 0;
+  form.elements.poAmount.value = money(quantity * unitPrice);
+}
+
+document.getElementById("poForm").elements.quantityOrdered.addEventListener("input", updatePOAmount);
+document.getElementById("poForm").elements.unitPrice.addEventListener("input", updatePOAmount);
 
 document.getElementById("requestForm").addEventListener("submit", (event) => {
   event.preventDefault();
@@ -468,7 +568,7 @@ document.getElementById("stockInForm").addEventListener("submit", (event) => {
     id: nextId("TX", state.transactions),
     itemCode: form.get("itemCode"),
     location: form.get("location"),
-    type: form.get("transactionType"),
+    type: "STOCK_IN_MANUAL",
     quantity: Number(form.get("quantity")),
     sourceId: "manual",
     notes: form.get("notes"),
@@ -483,65 +583,105 @@ document.getElementById("stockInForm").addEventListener("submit", (event) => {
   showToast("Manual stock-in saved.");
 });
 
+document.getElementById("manualStockOutForm").addEventListener("submit", (event) => {
+  event.preventDefault();
+  const form = new FormData(event.currentTarget);
+  const itemCode = form.get("itemCode");
+  const location = form.get("location");
+  const quantity = Number(form.get("quantity"));
+  const available = stockFor(itemCode, location);
+  if (!quantity || quantity < 1) return showToast("Stock out quantity must be greater than zero.", "error");
+  if (available < quantity) return showToast("Stock unavailable for this manual stock out.", "error");
+  const entry = {
+    id: nextId("TX", state.transactions),
+    itemCode,
+    location,
+    type: "STOCK_OUT",
+    quantity,
+    sourceId: "manual",
+    notes: form.get("notes"),
+    performedBy: form.get("issuedBy") || "Inventory Manager",
+    date: new Date().toISOString()
+  };
+  state.transactions.unshift(entry);
+  audit("MANUAL_STOCK_OUT", "stock_transaction", entry.id, `${entry.quantity} ${entry.itemCode} from ${entry.location}`);
+  event.currentTarget.reset();
+  saveState();
+  render();
+  showToast("Manual stock-out saved.");
+});
+
 document.getElementById("itemForm").addEventListener("submit", (event) => {
   event.preventDefault();
   const form = new FormData(event.currentTarget);
-  const code = String(form.get("code")).trim();
-  if (state.items.some((item) => item.code.toLowerCase() === code.toLowerCase())) {
-    return showToast("Item ID already exists.", "error");
-  }
-  state.items.push({
-    code,
-    name: String(form.get("name")).trim(),
-    type: String(form.get("type")).trim(),
-    category: form.get("category"),
-    reorderLevel: Number(form.get("reorderLevel")) || 0,
-    unit: String(form.get("unit")).trim(),
-    active: true
+  const category = String(form.get("newCategory") || form.get("category") || "").trim();
+  const name = String(form.get("name")).trim();
+  const unit = String(form.get("unit")).trim();
+  const rows = [...document.querySelectorAll("#itemTypeRows .item-type-row")].map((row) => ({
+    type: row.querySelector("[name='type']").value.trim(),
+    code: row.querySelector("[name='code']").value.trim()
+  }));
+  if (!category) return showToast("Choose a category or enter a new category.", "error");
+  if (!rows.length) return showToast("Add at least one item type.", "error");
+  if (rows.some((row) => !row.type || !row.code)) return showToast("Each type needs an Item ID.", "error");
+  const submittedCodes = rows.map((row) => row.code.toLowerCase());
+  if (new Set(submittedCodes).size !== submittedCodes.length) return showToast("Item ID already exists in this form.", "error");
+  const duplicate = rows.find((row) => state.items.some((item) => item.code.toLowerCase() === row.code.toLowerCase()));
+  if (duplicate) return showToast(`Item ID already exists: ${duplicate.code}`, "error");
+  rows.forEach((row) => {
+    state.items.push({
+      code: row.code,
+      name,
+      type: row.type,
+      category,
+      reorderLevel: 0,
+      unit,
+      active: true
+    });
   });
-  audit("CREATE_ITEM", "item", code, "Inventory item created");
+  audit("CREATE_ITEM", "item", rows.map((row) => row.code).join(", "), `${rows.length} item type(s) created for ${name}`);
   event.currentTarget.reset();
+  document.getElementById("itemTypeRows").innerHTML = "";
+  addItemTypeLine();
+  closeItemModal();
   saveState();
   render();
   showToast("Inventory item added.");
-});
-
-document.getElementById("locationForm").addEventListener("submit", (event) => {
-  event.preventDefault();
-  const form = new FormData(event.currentTarget);
-  const location = String(form.get("location")).trim();
-  if (state.locations.some((item) => item.toLowerCase() === location.toLowerCase())) {
-    return showToast("Location already exists.", "error");
-  }
-  state.locations.push(location);
-  audit("CREATE_LOCATION", "location", location, "Inventory location created");
-  event.currentTarget.reset();
-  saveState();
-  render();
-  showToast("Location added.");
 });
 
 document.getElementById("poForm").addEventListener("submit", (event) => {
   event.preventDefault();
   const form = new FormData(event.currentTarget);
   const vendor = state.vendors.find((row) => row.id === form.get("vendorId"));
-  const quantity = Number(form.get("quantity"));
+  const quantityOrdered = Number(form.get("quantityOrdered"));
   const unitPrice = Number(form.get("unitPrice"));
-  const poNumber = nextId("PO", state.purchaseOrders.map((po) => ({ poNumber: po.poNumber })));
+  const quantityReceived = Number(form.get("quantityReceived")) || 0;
+  const poNumber = String(form.get("poNumber") || "").trim() || nextId("PO", state.purchaseOrders.map((po) => ({ poNumber: po.poNumber })));
+  if (!vendor) return showToast("Select a vendor.", "error");
+  if (!quantityOrdered || quantityOrdered <= 0) return showToast("Quantity ordered must be greater than zero.", "error");
+  if (quantityReceived > quantityOrdered) return showToast("Quantity received cannot exceed quantity ordered.", "error");
+  if (state.purchaseOrders.some((po) => String(po.poNumber).toLowerCase() === poNumber.toLowerCase())) {
+    return showToast("PO number already exists.", "error");
+  }
   state.purchaseOrders.unshift({
     poNumber,
     vendorId: vendor.id,
     vendorName: vendor.name,
-    itemCode: form.get("itemCode"),
-    location: form.get("location"),
-    quantity,
+    issueDate: form.get("issueDate") || new Date().toISOString().slice(0, 10),
+    specifications: String(form.get("specifications")).trim(),
+    quantityOrdered,
     unitPrice,
-    total: quantity * unitPrice,
+    poAmount: quantityOrdered * unitPrice,
     status: form.get("status"),
+    arrivedBy: form.get("arrivedBy"),
+    location: form.get("location"),
+    quantityReceived,
+    notesRemarks: form.get("notesRemarks"),
     date: new Date().toISOString()
   });
   audit("CREATE_PO", "purchase_order", poNumber, "PO created; no stock movement posted");
   event.currentTarget.reset();
+  updatePOAmount();
   saveState();
   render();
   showToast(`${poNumber} created without changing stock.`);
@@ -615,6 +755,6 @@ document.getElementById("globalSearch").addEventListener("input", (event) => {
   });
 });
 
-window.addEventListener("resize", drawChart);
 addRequestLine();
+addItemTypeLine();
 render();
