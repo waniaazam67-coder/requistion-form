@@ -1980,6 +1980,10 @@ function buildLocalPrintHtml(payload) {
         `;
     }).join("");
     const isTransportRequest = (payload.items || []).some((item) => item.requestType === "transportation" || item.transportRequestType);
+    const firstTransportItem = (payload.items || []).find((item) => item.requestType === "transportation" || item.transportRequestType);
+    const formTitle = isTransportRequest
+        ? `${firstTransportItem?.transportRequestType || "Transportation"} Request Form`
+        : "PURCHASE/ WORK REQUEST FORM";
     const requestDetailsHtml = isTransportRequest
         ? buildTransportDetailsHtml(payload.items || [])
         : `<table>
@@ -1991,7 +1995,7 @@ function buildLocalPrintHtml(payload) {
 <html>
 <head>
 <meta charset="UTF-8">
-<title>Purchase/Work Request Form ${escapePrintHtml(payload.requestId || "")}<\/title>
+<title>${escapePrintHtml(formTitle)} ${escapePrintHtml(payload.requestId || "")}<\/title>
 <style>
 @page { size: A4 portrait; margin: 12mm; }
 * { box-sizing: border-box; }
@@ -2049,7 +2053,7 @@ td { height: 37px; line-height: 1.25; }
 <\/div>
 <main class="sheet">
     <section class="header">
-        <h1>PURCHASE/ WORK REQUEST FORM<\/h1>
+        <h1>${escapePrintHtml(formTitle).toUpperCase()}<\/h1>
         <img class="logo-mark" src="${escapePrintHtml(logoUrl)}" alt="Shehersaaz logo">
     <\/section>
     <section class="top-grid">
